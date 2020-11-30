@@ -10,7 +10,57 @@ jmp_buf jmpBuf; // 存放堆栈环境的变量
 int verify_password(uid_t uid){
     seteuid(0);  //以root权限运行
 
+    char ch;
+    int len = 0; //循环变量
+    int flag = 0;//计数三次的$
 
+    char salt[20] = {0};
+    char password[COMMAND_MAX] = {0};
+
+    struct termios oldt,newt;
+    struct spwd *pwd = getspnam(getpwuid(uid)->pw_name);
+
+    for (int i = 0; flag != 3; i++){ //获得spwd中的salt
+        salt[i] = pwd->sp_pwdp[i];
+        if (salt[i] == '$'){
+            flag++;
+        }
+        
+    }
+
+    while (1) //输入部分
+    {
+        tcgetattr(STDIN_FILENO,&oldt);
+        newt = oldt;
+        newt.c_lflag &=~(ECHO | ICANON); //标识相应标识位不会显
+        tcsetattr(STDIN_FILENO,TCSANOW,&newt); //设置标识位
+
+        ch = getchar();
+        if (ch == '\n')
+        {
+            password[len] = '\0';
+            tcsetattr(STDIN_FILENO,TCSANOW,&oldt);//恢复标识位
+            break; 
+        }
+
+        if (ch == 8)
+        {
+            continue;
+        }
+
+        password[len] = ch;
+        len++;
+        tcsetattr(STDIN_FILENO,TCSANOW,&oldt);    
+    }
+    
+    if(strcmp(pwd->sp_pwdp,crypt(password,salt)) == 0){ //密码正确
+        seteuid(geteuid());
+        return 1;
+    }else //密码错误
+    {
+        seteuid(geteuid());
+        return 0;
+    }
 }
 
 //初始化控制节点
@@ -38,7 +88,7 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
     {
         if(ssu){
             printf("root@");
-        }   // to do:？？
+        }   
         str = readline(inCommand);
 
     }while(strcmp(str,"") == 0)
@@ -48,7 +98,7 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
        printf("error:Command is too long!\n")
        exit(-1); //命令过长退出程序
     }else{
-        //add_history(str);
+        add_history(str);
         strcpy(cmd,str);
     }
 
@@ -72,7 +122,7 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
 
     if (strcmp(cmdNode->cmd,"pause") == 0)
     {
-        cmdNode->type = IN_COMMAND; //不懂？？
+        cmdNode->type = IN_COMMAND; 
         char ch;
         while ((ch = getchar()) == '\r')
         {
@@ -85,7 +135,7 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
         if(verify_password(getuid())){
             cmdNode->ssu = 1;
             seteuid(0);
-            longjmp(jmpBuf,0); //非局部跳转？？
+            longjmp(jmpBuf,0); //非局部跳转
         }else
         {
             printf("password error!\n");
@@ -119,7 +169,7 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
     
    if (strncmp(cmdNode->cmd,"cd",2) == 0)
    {
-       cmdNode->type = IN_COMMAND; //？？
+       cmdNode->type = IN_COMMAND; 
        in_arr(cmdNode->arg,cmdNode->cmd);
 
        //命令为cd或者cd ~
@@ -138,7 +188,7 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
 
     //放入arr，获取命令类型
     in_arr(cmdNode->arg,cmdNode->cmd);
-    get_type(cmdNode->arg,&(cmdNode->type));//指针？
+    get_type(cmdNode->arg,&(cmdNode->type));//指针类型
 
 }
 
@@ -221,11 +271,89 @@ void run(CMD_NODE *cmdNode){
     pid_t pid;
     pid = 0;
 
-    if (cmdNode->type | COMMAND_ERR) //认为应该写或，不是&？？？
-    {
-        /* code */
+    if (cmdNode->type == COMMAND_ERR) { 
+        printf("你输入的命令有误，请检查后重试\n")；
+        return ;
+    }
+
+    if (cmdNote->type == IN_COMMAND){
+        return;
     }
     
+    pid = fork(); //创建子进程
+
+    if (pid < 0){
+        printf("创建子进程失败");
+        exit(-1);
+    }
+    
+    if (pid == 0){  //子进程
+
+        if (cmdNote->type & IN_REDIRECT){
+            int fid;
+            if(cmdNode->type & IN_REDIRECT_APP){
+                fid = open(cmdNode->infile,O_RDONLY|O_CREAT|O_APPEND,0644); 
+                //只读|文件不存在自动创建|写入的数据以附加方式加入到文件后边
+            }else
+            {
+               fid =  open(cmdNode->infile,O_RDONLY|O_CREAT,0644); 
+            }
+            dup2(fid,STDIN); //进行输入重定向
+        }
+
+
+        if (cmdNode->type & OUT_REDIRECT){ //如果有>>> 参数
+            int fod;
+            if (cmdNode->type & OUT_REDIRECT_APP){
+                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT|O_APPEND,0644)//???
+            }else
+            {
+                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT,0644)
+            }
+            dup2(fod,STDOUT); //进行输出重定向
+        }
+
+
+        if (cmdNode->type & HAVE_PIPE){
+            pid_t pid2 = 0;
+            int fd = 0;
+
+            pid2 = fork(); //再创建一个进程，子进程的子进程运行管道前命令，子进程运行管道后命令
+            if (pid2 < 0){
+                printf("管道命令运行失败\n");
+                exit(-1);
+            }
+
+            if (pid2 == 0){
+                fd = open("/tmp/shellTemp",O_WRONLY|O_CREAT|O_TRUNC,0644);//???
+                dup2(fd,STDOUT);
+                execvp(cmdNode->argList[0],cmdNode->argList);
+                printf("你输入的命令有误，请检查后重试\n");
+                exit(1); // 防止子子进程的exec函数没有运行导致错误
+            }
+
+            if (waitpid(pid2,0,0) == -1){
+               printf("管道命令运行失败\n");
+               exit(-1);
+            }
+
+            fd = open("/tmp/shellTemp",O_RDONLY);
+            dup2(fd,STDIN);
+            execvp(cmdNode->argNext[0],cmdNode->argNext);
+            printf("你输入的命令有误，请检查后重试\n");
+            exit(1); // 防止子进程的exec函数没有运行导致错误
+        }
+   }   
+
+   if (cmdNode->type & BACKSTAGE){ //???
+       printf("子进程的pid为%d \n",pid);
+       return ; 
+   }
+   
+   if (waitpid(pid2,0,0) == -1){
+        printf("等待子进程失败\n");
+        exit(-1);
+    }
 }
 
 // 输出控制节点的信息
@@ -266,6 +394,26 @@ void get_his(FHISNODE fhisNode){
     strcat(temp,"/.history");
     fhisNode->fthis = fopen(temp,"a+");
 
+    if (fscanf(fhisNode->fthis,"%d",&(fhisNode->hisSubs)) == EOF){
+        fhisNode -> hisSubs = 0;
+    }
+    
+    int subs = fhisNode -> hisSubs;
+
+    for (int i = 0; i < HIS_MAX; i++){
+        fscanf(fhisNode->fthis,"%s",fhisNode->history[i]);
+    }
+
+    for (int i = (fhisNode->hisSubs + 1)%HIS_MAX; i != fhisNode->hisSubs; i = (i+1)% HIS_MAX){
+        if(fhisNode->history[i][0] == '\0'){
+            continue ;
+        }
+        add_history(fhisNode->history[i]);
+    }
+    add_history(fhisNode->history[fhisNode->hisSubs]);
+    
+    fclose(fhisNode->fthis);
+    fhisNode->fthis = fopen(temp,"w"); //???
 }
 
 //保存历史命令文件
@@ -277,4 +425,76 @@ void save_his(HISNODE hisNode){
         fprintf(hisNode.fthis,"%s\n",hisNode.history[i]);
     }
     fclose(hisNode.fthis);
+}
+
+// 处理一些命令特有事情
+void other_work(CMD_NODE *cmdNode)){
+    int argIndex = 0;
+    int argListIndex = 0;
+    int nextIndex = 0;
+    int isNext = 0;
+    int type = cmdNode -> type; 
+
+    if (type & COMMAND_ERR || type & IN_COMMAND){
+        return ;
+    }
+    
+    while(cmdNode->arg[argIndex][0] != '\0')
+    {
+        if (type & BACKSTAGE){  //有后台运行命令
+            cmdNode->argList[argListIndex] = NULL; //屏蔽后台运行
+            break ; //后台运行符后边的参数不加入到artList中
+        }
+
+        if (strncmp(cmdNode->argList[argIndex],"<",1) == 0 || strncmp(cmdNode->argList[argIndex],">",1)){ //判断是否为重定向输入或输出
+            
+            argIndex++; //跳过> >> < <<
+
+            if (cmdNode->argList[argIndex-1][0] == '>'){
+                strcpy(cmdNode->outfile,cmdNode->argList[argIndex]);
+            }else
+            {
+                strcpy(cmdNode->infile,cmdNode->argList[argIndex]);
+            }
+            
+            argIndex++; //跳过路径
+            continue;
+        }
+        
+        if (strcmp(cmdNode->arg[argIndex],"|") == 0){ //判断是否为管道命令
+            argIndex++;
+            isNext = 1;
+            continue;//？to
+        }
+        
+        if (isNext){ //是管道命令,开始给Next数组中存放数据
+            cmdNode -> argNext[nextIndex++] = cmdNode -> arg[argIndex++];
+        }else{
+            cmdNode -> argNext[argListIndex++] = cmdNode -> arg[argIndex++];
+        }      
+    }
+}
+
+//综合所有函数的最终体
+void shell(void){
+    CMD_NODE cmdNote = {0};
+    HISNODE hisNode = {0};
+
+    get_his(&hisNode); //得到历史命令
+    chdir(getenv("HOME")); //初始工作目录在用户的HOME目录
+
+    struct sigaction act;
+    act.sa_handler = sigint;
+    act.sa_flags = SA_NOMASK;
+    sigaction(SIGINT,&act,NULL);//安装信号屏蔽函数
+
+    while (1)
+    {
+        setjmp(jmpBuf); //跳转到初始化目录
+        initNode(&cmdNote);
+        get_input(cmdNote.cmd,getcwd(cmdNote.workpath,FILE_PATH_MAX),&hisNode,cmdNote.ssu);
+        explain_input(&cmdNote,hisNode);
+        other_work(&cmdNote);
+        run(&cmdNote);
+    }
 }

@@ -73,5 +73,7 @@ void run(CMD_NODE *cmdNode)//按类别执行命令
 void put(CMD_NODE *cmdNode,HISNODE hisNode);   // 输出控制节点的信息
 void get_his(FHISNODE fhisNode); //得到历史命令文件
 void save_his(HISNODE hisNode); //保存历史命令文件
+void other_work(CMD_NODE *cmdNode); // 处理一些命令特有事情 to do 
+void shell(void); //综合所有函数的最终体
 
 #endif  // !_SHELL_H_
