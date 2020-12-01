@@ -8,7 +8,7 @@
  - 带输入重定向的命令: wc -c < a
  - 带管道命令: ls -l | wc -c
  - 后台运行符可以添加到命令的最后面: 如 ls &
- - 输入exit或logout退出myshell
+ - 输入exit退出myshell
  ***
  
  ## **错误处理**

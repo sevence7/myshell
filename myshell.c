@@ -120,11 +120,11 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
         exit(0);
     }
 
-    if (strcmp(cmdNode->cmd,"pause") == 0)
+    if (strcmp(cmdNode->cmd,"pause") == 0)// to do
     {
         cmdNode->type = IN_COMMAND; 
         char ch;
-        while ((ch = getchar()) == '\r')
+        while ((ch = getchar()) == '\n')
         {
             return;
         }
