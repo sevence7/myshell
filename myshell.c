@@ -103,7 +103,7 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
     }
 
     strcpy(fhisNode->history[fhisNode->hisSubs],str);
-    fhisNode->history = (fhisNode->hisSubs+1) % HIS_MAX;
+    fhisNode-> hisSubs = (fhisNode->hisSubs+1) % HIS_MAX;
 }
 
 //对输入命令进行解析,判断是否为内部命令，否则放入arg数组中
