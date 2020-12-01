@@ -49,7 +49,7 @@ typedef struct CommandNode{
     char  cmd[COMMAND_MAX]; //用户输入的命令
     char  arg[ARGLIST_NUM_MAX][COMMAND_MAX];//存放所有分解命令
     char *argList[ARGLIST_NUM_MAX+1]; // 对用户输入的命令进行解析之后的字符串数组 , +1 是为了execvp操作
-    char *argNext[ARGLIST_NUM_MAX]；//管道之后命令的字符串数组
+    char *argNext[ARGLIST_NUM_MAX];//管道之后命令的字符串数组
     char infile[FILE_PATH_MAX]; //存放输入重定向文件路径
     char outfile[FILE_PATH_MAX];//存放输出重定向文件路径
     char workpath[FILE_PATH_MAX];//存放工作目录的数组
@@ -69,11 +69,12 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
 void explain_input(CMD_NODE *cmdNode,HISNODE hisNode);//对输入命令进行解析
 void in_arr(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],char *cmd);//将命令放入arr中
 void get_type(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],COMMAND_TYPE *type);//将命令分类
-void run(CMD_NODE *cmdNode)//按类别执行命令
-void put(CMD_NODE *cmdNode,HISNODE hisNode);   // 输出控制节点的信息
+void run(CMD_NODE *cmdNode);//按类别执行命令
+void put(CMD_NODE *cmdNode,HISNODE hisNode);  // 输出控制节点的信息
 void get_his(FHISNODE fhisNode); //得到历史命令文件
 void save_his(HISNODE hisNode); //保存历史命令文件
-void other_work(CMD_NODE *cmdNode); // 处理一些命令特有事情 to do 
+void other_work(CMD_NODE *cmdNode); // 处理一些命令特有事情
+void sigint(int signo);//SIGINT信号屏蔽函数
 void shell(void); //综合所有函数的最终体
 
 #endif  // !_SHELL_H_

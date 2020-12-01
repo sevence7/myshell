@@ -68,14 +68,14 @@ void initNode(CMD_NODE *cmdNode){
 
     if(cmdNode->ssu == 0){
         seteuid(getuid());   //获得实际用户的uid运行
-        memset(cmdNode,0,sizeof(Cmd_Node));//内存空间初始化
+        memset(cmdNode,0,sizeof(CMD_NODE));//内存空间初始化
     }else
     {
-        memset(cmdNode,0,sizeof(Cmd_Node));
+        memset(cmdNode,0,sizeof(CMD_NODE));
         cmdNode->ssu = 1;
     }   
 
-    cmdNode->type = NORMAL； //类型为一般命令
+    cmdNode->type = NORMAL; //类型为一般命令
 } 
 
 //得到输入的命令
@@ -86,16 +86,16 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
 
     do
     {
-        if(ssu){
+        if(su){
             printf("root@");
         }   
         str = readline(inCommand);
 
-    }while(strcmp(str,"") == 0)
+    }while(strcmp(str,"") == 0);
     
 
     if(strlen(str) == COMMAND_MAX){
-       printf("error:Command is too long!\n")
+       printf("error:Command is too long!\n");
        exit(-1); //命令过长退出程序
     }else{
         add_history(str);
@@ -213,10 +213,10 @@ void in_arr(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],char *cmd){
 
 //将命令分类
 void get_type(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],COMMAND_TYPE *type){
-    int argFlag = 0;
+    int argflag = 0;
     int count[6] = {0};
 
-    while(arg[argFlag][0] != '\0'){
+    while(arg[argflag][0] != '\0'){
 
         if (strcmp(arg[argflag],"|") == 0){ //将命令类型置为管道命令
             *type |= HAVE_PIPE; //???
@@ -248,7 +248,7 @@ void get_type(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],COMMAND_TYPE *type){
             count[5]++;
         }
 
-        argFlag++;
+        argflag++;
     }
 
     //检验类型是否重复定义
@@ -272,11 +272,11 @@ void run(CMD_NODE *cmdNode){
     pid = 0;
 
     if (cmdNode->type == COMMAND_ERR) { 
-        printf("你输入的命令有误，请检查后重试\n")；
+        printf("你输入的命令有误，请检查后重试\n");
         return ;
     }
 
-    if (cmdNote->type == IN_COMMAND){
+    if (cmdNode->type == IN_COMMAND){
         return;
     }
     
@@ -289,7 +289,7 @@ void run(CMD_NODE *cmdNode){
     
     if (pid == 0){  //子进程
 
-        if (cmdNote->type & IN_REDIRECT){
+        if (cmdNode->type & IN_REDIRECT){
             int fid;
             if(cmdNode->type & IN_REDIRECT_APP){
                 fid = open(cmdNode->infile,O_RDONLY|O_CREAT|O_APPEND,0644); 
@@ -305,10 +305,10 @@ void run(CMD_NODE *cmdNode){
         if (cmdNode->type & OUT_REDIRECT){ //如果有>>> 参数
             int fod;
             if (cmdNode->type & OUT_REDIRECT_APP){
-                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT|O_APPEND,0644)//???
+                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT|O_APPEND,0644);//???
             }else
             {
-                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT,0644)
+                fod = open(cmdNode->outfile,O_WRONLY|O_CREAT,0644);
             }
             dup2(fod,STDOUT); //进行输出重定向
         }
@@ -350,7 +350,7 @@ void run(CMD_NODE *cmdNode){
        return ; 
    }
    
-   if (waitpid(pid2,0,0) == -1){
+   if (waitpid(pid,0,0) == -1){
         printf("等待子进程失败\n");
         exit(-1);
     }
@@ -428,7 +428,7 @@ void save_his(HISNODE hisNode){
 }
 
 // 处理一些命令特有事情
-void other_work(CMD_NODE *cmdNode)){
+void other_work(CMD_NODE *cmdNode){
     int argIndex = 0;
     int argListIndex = 0;
     int nextIndex = 0;
@@ -473,6 +473,11 @@ void other_work(CMD_NODE *cmdNode)){
             cmdNode -> argNext[argListIndex++] = cmdNode -> arg[argIndex++];
         }      
     }
+}
+
+void sigint(int signo) {
+    printf("\n");
+    longjmp(jmpBuf, 0);
 }
 
 //综合所有函数的最终体
