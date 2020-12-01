@@ -94,7 +94,7 @@ void get_input(char cmd[COMMAND_MAX],char inCommand[IN_COMMAND],FHISNODE fhisNod
     }while(strcmp(str,"") == 0);
     
 
-    if(strlen(str) == COMMAND_MAX){
+    if(strlen(str) > COMMAND_MAX){
        printf("error:Command is too long!\n");
        exit(-1); //命令过长退出程序
     }else{
@@ -165,7 +165,7 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
                 longjmp(jmpBuf,0);
             }           
         }
-   }
+    }
     
    if (strncmp(cmdNode->cmd,"cd",2) == 0)
    {
@@ -186,6 +186,20 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
        return ;
    }
 
+    if (strcmp(cmdNode->cmd,"history") == 0)
+    {
+        for (int i = (hisNode.hisSubs + 1) % HIS_MAX; i != hisNode.hisSubs; i = (i+1) % HIS_MAX)
+        {
+            if (hisNode.history[i][0] == '\0')
+            {
+                continue ;
+            }
+            printf("%s\n",hisNode.history[i]);
+        }
+        printf("%s\n",hisNode.history[hisNode.hisSubs]);
+        return;
+    }
+    
     //放入arr，获取命令类型
     in_arr(cmdNode->arg,cmdNode->cmd);
     get_type(cmdNode->arg,&(cmdNode->type));//指针类型
@@ -195,16 +209,16 @@ void explain_input(CMD_NODE *cmdNode,HISNODE hisNode){
 //将命令放入arr中
 void in_arr(char arg[ARGLIST_NUM_MAX][COMMAND_MAX],char *cmd){
 
-    int argFlag = 0;
+    int argflag = 0;
     int flag = 0;
     while (*cmd != '\0')
     {
         if (*cmd == ' '){  //遇到空格换下一个数组
-            argFlag++;
+            argflag++;
             flag = -1;
         }else
         {
-            arg[argFlag][flag] = *cmd;
+            arg[argflag][flag] = *cmd;
         }
         cmd++;
         flag++;
@@ -289,7 +303,7 @@ void run(CMD_NODE *cmdNode){
     
     if (pid == 0){  //子进程
 
-        if (cmdNode->type & IN_REDIRECT){
+        if (cmdNode->type & IN_REDIRECT){ //如果有 < < < 参数
             int fid;
             if(cmdNode->type & IN_REDIRECT_APP){
                 fid = open(cmdNode->infile,O_RDONLY|O_CREAT|O_APPEND,0644); 
@@ -343,16 +357,19 @@ void run(CMD_NODE *cmdNode){
             printf("你输入的命令有误，请检查后重试\n");
             exit(1); // 防止子进程的exec函数没有运行导致错误
         }
+
+        execvp(cmdNode->argList[0],cmdNode->argList);
+        printf("你输入的命令有误，请检查后重试\n");
+        exit(1); // 防止子进程的exec函数没有运行导致错误
    }   
 
    if (cmdNode->type & BACKSTAGE){ //???
-       printf("子进程的pid为%d \n",pid);
+       printf("子进程的pid为%d\n",pid);
        return ; 
    }
    
    if (waitpid(pid,0,0) == -1){
         printf("等待子进程失败\n");
-        exit(-1);
     }
 }
 
@@ -446,19 +463,19 @@ void other_work(CMD_NODE *cmdNode){
             break ; //后台运行符后边的参数不加入到artList中
         }
 
-        if (strncmp(cmdNode->argList[argIndex],"<",1) == 0 || strncmp(cmdNode->argList[argIndex],">",1)){ //判断是否为重定向输入或输出
+        if (strncmp(cmdNode->arg[argIndex],"<",1) == 0 || strncmp(cmdNode->arg[argIndex],">",1) == 0){ //判断是否为重定向输入或输出
             
             argIndex++; //跳过> >> < <<
 
-            if (cmdNode->argList[argIndex-1][0] == '>'){
-                strcpy(cmdNode->outfile,cmdNode->argList[argIndex]);
+            if (cmdNode->arg[argIndex-1][0] == '>'){
+                strcpy(cmdNode->outfile,cmdNode->arg[argIndex]);
             }else
             {
-                strcpy(cmdNode->infile,cmdNode->argList[argIndex]);
+                strcpy(cmdNode->infile,cmdNode->arg[argIndex]);
             }
             
             argIndex++; //跳过路径
-            continue;
+            continue; //跳过此次argList指向arg
         }
         
         if (strcmp(cmdNode->arg[argIndex],"|") == 0){ //判断是否为管道命令
@@ -470,7 +487,7 @@ void other_work(CMD_NODE *cmdNode){
         if (isNext){ //是管道命令,开始给Next数组中存放数据
             cmdNode -> argNext[nextIndex++] = cmdNode -> arg[argIndex++];
         }else{
-            cmdNode -> argNext[argListIndex++] = cmdNode -> arg[argIndex++];
+            cmdNode -> argList[argListIndex++] = cmdNode -> arg[argIndex++];
         }      
     }
 }
@@ -496,10 +513,11 @@ void shell(void){
     while (1)
     {
         setjmp(jmpBuf); //跳转到初始化目录
-        initNode(&cmdNote);
-        get_input(cmdNote.cmd,getcwd(cmdNote.workpath,FILE_PATH_MAX),&hisNode,cmdNote.ssu);
+        initNode(&cmdNode);
+        get_input(cmdNode.cmd,getcwd(cmdNode.workpath,FILE_PATH_MAX),&hisNode,cmdNote.ssu);
         explain_input(&cmdNote,hisNode);
         other_work(&cmdNote);
         run(&cmdNote);
+        put(&cmdNode,hisNode);
     }
 }
