@@ -499,7 +499,7 @@ void sigint(int signo) {
 
 //综合所有函数的最终体
 void shell(void){
-    CMD_NODE cmdNote = {0};
+    CMD_NODE cmdNode = {0};
     HISNODE hisNode = {0};
 
     get_his(&hisNode); //得到历史命令
@@ -514,10 +514,10 @@ void shell(void){
     {
         setjmp(jmpBuf); //跳转到初始化目录
         initNode(&cmdNode);
-        get_input(cmdNode.cmd,getcwd(cmdNode.workpath,FILE_PATH_MAX),&hisNode,cmdNote.ssu);
-        explain_input(&cmdNote,hisNode);
-        other_work(&cmdNote);
-        run(&cmdNote);
-        put(&cmdNode,hisNode);
+        get_input(cmdNode.cmd,getcwd(cmdNode.workpath,FILE_PATH_MAX),&hisNode,cmdNode.ssu);
+        explain_input(&cmdNode,hisNode);
+        other_work(&cmdNode);
+        run(&cmdNode);
+        //put(&cmdNode,hisNode);
     }
 }
